@@ -3,24 +3,24 @@
 Kept in its own module so it can be unit-tested without spinning up a server,
 and so the JS lives in one easily-auditable place.
 
-The page implements World ID's recommended IDKit UX (see [the design
-guidelines][dg]) without pulling in React or the deprecated
+The page implements the IDKit UX recommended by World ID's [design
+guidelines][dg] without pulling in React or the deprecated
 `@worldcoin/idkit-standalone` package:
 
-1. Fetches IDKit init config (``app_id``, ``action``, ``rp_context``) from
-   the local server, which proxies to engram-server.
+1. Auto-fetches the IDKit init payload (``app_id``, ``action``,
+   ``rp_context``) from the local server, which proxies to engram-server.
 2. Calls ``IDKit.request(...)`` from `@worldcoin/idkit-core` (loaded from
    esm.sh) to get a ``connectorURI`` -- a universal link that doubles as
    the QR-code payload (desktop) and a deep link into World App (mobile).
-3. Renders the connector URI as a **QR code** (rendered with `qrcode`
-   from esm.sh -- the same library used by ``@worldcoin/idkit``) and a
-   prominent **"Open in World App"** button. Mobile user-agents see the
-   deep-link button promoted above the QR code so a single tap launches
-   World App without any scanning.
+3. Renders the connector URI as a centered **QR code** (rendered with
+   `qrcode` from esm.sh -- the same library used by ``@worldcoin/idkit``)
+   and a prominent **"Open in World App"** button. Mobile user-agents see
+   the deep-link button promoted above the QR code so a single tap
+   launches World App without any scanning.
 4. Polls for completion and walks through the status states recommended by
-   IDKit's design guidelines (idle / scanning / exchanging / success /
-   canceled / connection-lost / error). On error or cancel, a
-   "Try again" affordance re-runs the flow without a page reload.
+   IDKit's design guidelines (loading / scanning / exchanging / verified /
+   error). On error, a "Try again" affordance re-runs the flow without a
+   page reload.
 5. On success, POSTs the proof to ``/proof`` (which forwards it to
    engram-server and persists the resulting access token).
 6. If the user clicks "I'd rather not", POSTs to ``/decline`` instead so
@@ -41,16 +41,19 @@ VERIFY_HTML = """<!doctype html>
 <title>Engram - Connect your World ID</title>
 <style>
   :root {
-    --bg: #0e0e10;
-    --card: #16161a;
-    --card-border: #26262c;
-    --muted: #b3b3b8;
-    --subtle: #8a8a92;
+    --bg-1: #0b0b0e;
+    --bg-2: #161620;
+    --card: #15151b;
+    --card-border: #26262f;
+    --hairline: #1f1f27;
+    --fg: #f4f4f6;
+    --muted: #a8a8b1;
+    --subtle: #6f6f78;
     --accent: #4f46e5;
-    --accent-hover: #5e55ee;
-    --decline: #2a2a2e;
-    --decline-hover: #34343a;
-    --ok: #16a34a;
+    --accent-hover: #6357f0;
+    --decline: #20202a;
+    --decline-hover: #2a2a36;
+    --ok: #22c55e;
     --warn: #f59e0b;
     --err: #ef4444;
     --link: #93c5fd;
@@ -58,85 +61,85 @@ VERIFY_HTML = """<!doctype html>
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-      sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
+      Roboto, sans-serif;
     margin: 0;
-    background: radial-gradient(
-      1200px 600px at 50% -200px, #1c1c25 0%, var(--bg) 60%
-    );
-    color: #eaeaea;
+    background:
+      radial-gradient(900px 500px at 50% -120px,
+        rgba(79, 70, 229, 0.18) 0%, transparent 60%),
+      radial-gradient(600px 400px at 50% 120%,
+        rgba(255, 255, 255, 0.04) 0%, transparent 60%),
+      var(--bg-1);
+    color: var(--fg);
     display: flex;
     min-height: 100vh;
     align-items: center;
     justify-content: center;
     padding: 24px;
+    -webkit-font-smoothing: antialiased;
   }
   .card {
-    width: 460px;
+    width: 380px;
     max-width: 100%;
-    background: var(--card);
+    background: linear-gradient(180deg, #181821 0%, #131319 100%);
     border: 1px solid var(--card-border);
-    border-radius: 16px;
-    padding: 28px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+    border-radius: 18px;
+    padding: 28px 24px 22px;
+    box-shadow:
+      0 24px 60px rgba(0, 0, 0, 0.55),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    text-align: center;
   }
   .brand {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    padding: 6px 12px 6px 8px;
     margin-bottom: 18px;
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
     color: var(--muted);
-    font-size: 13px;
+    font-size: 12px;
     letter-spacing: 0.02em;
   }
-  .brand-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #ffffff 0%, #6b7280 100%);
-    box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
-  }
-  .brand strong { color: #ffffff; font-weight: 600; }
+  .brand svg { display: block; }
+  .brand .sep { color: var(--subtle); }
+  .brand .who { color: #ffffff; font-weight: 600; }
   h1 {
-    font-size: 22px;
-    margin: 0 0 8px;
+    font-size: 20px;
+    margin: 0 0 6px;
     font-weight: 600;
     letter-spacing: -0.01em;
   }
   p.lead {
-    margin: 0 0 20px;
+    margin: 0 auto 22px;
     color: var(--muted);
     line-height: 1.55;
-    font-size: 14px;
+    font-size: 13.5px;
+    max-width: 320px;
   }
-  .qr-wrap {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 16px;
-    padding: 22px;
+  /* QR slot. Always reserves the same square so the layout doesn't jump
+     between the loading skeleton and the rendered QR. */
+  .qr-frame {
+    width: 232px;
+    height: 232px;
+    margin: 0 auto 16px;
     background: #ffffff;
-    border-radius: 12px;
-    margin-bottom: 16px;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow:
+      0 12px 30px rgba(0, 0, 0, 0.35),
+      0 0 0 1px rgba(255, 255, 255, 0.04);
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
-  .qr-wrap.dark {
-    background: #0a0a0c;
-    border: 1px solid var(--card-border);
-  }
-  .qr-wrap svg, .qr-wrap canvas {
-    width: 200px;
-    height: 200px;
+  .qr-frame > * {
     display: block;
+    width: 200px !important;
+    height: 200px !important;
   }
-  .qr-caption {
-    color: #1f2937;
-    font-size: 13px;
-    text-align: center;
-  }
-  .qr-wrap.dark .qr-caption { color: var(--muted); }
   .qr-skeleton {
-    width: 200px;
-    height: 200px;
     border-radius: 8px;
     background: linear-gradient(
       90deg,
@@ -145,16 +148,16 @@ VERIFY_HTML = """<!doctype html>
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
   }
-  .qr-wrap.dark .qr-skeleton {
-    background: linear-gradient(
-      90deg, #15151a 0%, #1d1d24 50%, #15151a 100%
-    );
-    background-size: 200% 100%;
-  }
   @keyframes shimmer {
     0% { background-position: 200% 0; }
     100% { background-position: -200% 0; }
   }
+  .qr-caption {
+    color: var(--muted);
+    font-size: 12.5px;
+    margin: 0 0 16px;
+  }
+  .qr-caption strong { color: #ffffff; font-weight: 600; }
   .deeplink {
     display: block;
     text-align: center;
@@ -162,42 +165,57 @@ VERIFY_HTML = """<!doctype html>
     background: var(--accent);
     color: white;
     font-weight: 600;
-    font-size: 14px;
-    padding: 12px 14px;
+    font-size: 13.5px;
+    padding: 11px 14px;
     border-radius: 10px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
+    transition: background 0.12s ease;
   }
   .deeplink:hover { background: var(--accent-hover); }
-  .deeplink[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
-  .row { display: flex; gap: 10px; margin-top: 4px; }
-  button {
-    flex: 1;
-    padding: 12px 14px;
-    border-radius: 10px;
-    border: 0;
-    font-weight: 600;
-    cursor: pointer;
-    font-size: 14px;
-    font-family: inherit;
+  .deeplink[aria-disabled="true"] {
+    opacity: 0.4;
+    pointer-events: none;
+    background: var(--decline);
   }
-  .verify { background: var(--accent); color: white; }
-  .verify:hover { background: var(--accent-hover); }
-  .decline { background: var(--decline); color: #d6d6d6; }
-  .decline:hover { background: var(--decline-hover); }
-  button:disabled { opacity: 0.45; cursor: not-allowed; }
-  .status {
-    margin-top: 18px;
-    padding: 12px 14px;
-    border-radius: 10px;
-    background: #0b0b0d;
+  .deeplink-secondary {
+    background: transparent;
+    color: var(--muted);
     border: 1px solid var(--card-border);
+  }
+  .deeplink-secondary:hover {
+    background: var(--decline);
+    color: var(--fg);
+  }
+  .decline {
+    display: block;
+    width: 100%;
+    background: transparent;
+    color: var(--subtle);
+    border: 0;
+    cursor: pointer;
+    font-weight: 500;
     font-size: 13px;
+    padding: 8px 14px;
+    margin-top: 6px;
+    font-family: inherit;
+    border-radius: 8px;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .decline:hover { color: var(--fg); background: var(--decline); }
+  .decline:disabled { opacity: 0.4; cursor: not-allowed; }
+  .status {
+    margin: 14px auto 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--hairline);
+    font-size: 12.5px;
     color: var(--muted);
     line-height: 1.5;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 10px;
-    min-height: 1.4em;
+    text-align: left;
   }
   .status.hidden { display: none; }
   .status .dot {
@@ -206,69 +224,91 @@ VERIFY_HTML = """<!doctype html>
     height: 8px;
     border-radius: 50%;
     background: var(--subtle);
-    margin-top: 6px;
   }
-  .status.scanning .dot { background: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
-  .status.exchanging .dot { background: var(--warn); animation: pulse 1.2s ease-in-out infinite; }
+  .status.scanning .dot,
+  .status.loading .dot {
+    background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .status.exchanging .dot {
+    background: var(--warn);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
   .status.ok .dot { background: var(--ok); }
   .status.err .dot { background: var(--err); }
   @keyframes pulse {
-    0% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.4); }
-    100% { opacity: 1; transform: scale(1); }
+    0%   { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6); }
+    70%  { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
   }
   .status .body { flex: 1; }
-  .footer {
-    margin-top: 18px;
-    text-align: center;
-    color: var(--subtle);
-    font-size: 12px;
+  .status a {
+    color: var(--link);
+    text-decoration: none;
+    font-weight: 600;
   }
-  .footer a { color: var(--link); text-decoration: none; }
-  .footer a:hover { text-decoration: underline; }
+  .status a:hover { text-decoration: underline; }
+  .footer {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+    color: var(--subtle);
+    font-size: 11.5px;
+  }
+  .footer a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .footer a:hover {
+    color: var(--fg);
+    text-decoration: underline;
+  }
   .hide-on-mobile { display: block; }
   .show-on-mobile { display: none; }
-  .desktop-instr { color: var(--subtle); font-size: 12px; margin-top: 8px; text-align: center; }
   @media (max-width: 480px) {
     .hide-on-mobile { display: none; }
     .show-on-mobile { display: block; }
+    .card { padding: 24px 18px 18px; }
   }
 </style>
 </head>
 <body>
 <div class="card" role="main" aria-labelledby="title">
-  <div class="brand">
-    <span class="brand-dot" aria-hidden="true"></span>
-    <span>Engram &times; <strong>World ID</strong></span>
+  <div class="brand" aria-hidden="true">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+      <circle cx="7" cy="7" r="6" stroke="white" stroke-width="1.4"/>
+      <path d="M2 7h10M7 2c1.6 1.4 2.5 3.1 2.5 5S8.6 10.6 7 12M7 2C5.4 3.4 4.5 5.1 4.5 7S5.4 10.6 7 12"
+            stroke="white" stroke-width="1.2" fill="none"/>
+    </svg>
+    <span class="who">Engram</span>
+    <span class="sep">×</span>
+    <span class="who">World ID</span>
   </div>
   <h1 id="title">Connect your World ID</h1>
   <p class="lead">
-    Engram's memory tools (<code>learn</code> and <code>recall</code>) are
-    gated on a one-time proof of personhood. Verify with World App and
-    you'll never have to do this again on this machine.
+    A one-time proof of personhood unlocks Engram's memory tools.
+    Verify with World App and you'll never have to do it again on
+    this machine.
   </p>
 
-  <!-- Mobile: deep-link first, QR hidden behind a toggle. -->
+  <!-- Mobile: deep-link first; the QR is hidden because the user is
+       already on their phone. -->
   <a id="deeplink" class="deeplink show-on-mobile" href="#"
      aria-disabled="true">Open in World App</a>
 
-  <!-- Desktop: QR primary, deep-link as a fallback button below. -->
-  <div id="qr-wrap" class="qr-wrap hide-on-mobile">
+  <!-- Desktop: QR primary, deep-link as a secondary fallback below. -->
+  <div class="qr-frame hide-on-mobile">
     <div id="qr" class="qr-skeleton" aria-label="QR code for World App"></div>
-    <div class="qr-caption">
-      Scan with <strong>World App</strong> on your phone
-    </div>
   </div>
-  <a id="deeplink-desktop" class="deeplink hide-on-mobile" href="#"
-     aria-disabled="true"
-     style="background: var(--decline); color: #e6e6e6;">
+  <p class="qr-caption hide-on-mobile">
+    Scan with <strong>World App</strong> on your phone
+  </p>
+  <a id="deeplink-desktop" class="deeplink deeplink-secondary hide-on-mobile"
+     href="#" aria-disabled="true">
     Or open in World App on this device
   </a>
 
-  <div class="row">
-    <button class="verify" id="verify">Verify with World ID</button>
-    <button class="decline" id="decline">I'd rather not</button>
-  </div>
+  <button class="decline" id="decline" type="button">I'd rather not</button>
 
   <div id="status" class="status hidden" role="status" aria-live="polite">
     <span class="dot" aria-hidden="true"></span>
@@ -289,28 +329,25 @@ VERIFY_HTML = """<!doctype html>
 <script type="module">
   const statusEl = document.getElementById("status");
   const statusBody = document.getElementById("status-body");
-  const verifyBtn = document.getElementById("verify");
   const declineBtn = document.getElementById("decline");
   const qrEl = document.getElementById("qr");
-  const qrWrap = document.getElementById("qr-wrap");
   const deeplinkEl = document.getElementById("deeplink");
   const deeplinkDesktopEl = document.getElementById("deeplink-desktop");
 
   /** UI state machine. Each call replaces the visible status bar. */
   function setStatus(kind, text) {
-    statusEl.classList.remove("hidden", "scanning", "exchanging", "ok", "err");
+    statusEl.classList.remove(
+      "hidden", "loading", "scanning", "exchanging", "ok", "err"
+    );
     if (kind) statusEl.classList.add(kind);
     statusBody.textContent = text;
   }
   function setStatusHTML(kind, html) {
-    statusEl.classList.remove("hidden", "scanning", "exchanging", "ok", "err");
+    statusEl.classList.remove(
+      "hidden", "loading", "scanning", "exchanging", "ok", "err"
+    );
     if (kind) statusEl.classList.add(kind);
     statusBody.innerHTML = html;
-  }
-  function clearStatus() {
-    statusEl.classList.add("hidden");
-    statusEl.classList.remove("scanning", "exchanging", "ok", "err");
-    statusBody.textContent = "";
   }
 
   function setDeepLinks(uri) {
@@ -330,7 +367,7 @@ VERIFY_HTML = """<!doctype html>
     const QRCode = (await import("https://esm.sh/qrcode@1.5.4")).default;
     const svg = await QRCode.toString(text, {
       type: "svg",
-      margin: 1,
+      margin: 0,
       width: 200,
       color: { dark: "#0a0a0c", light: "#ffffff" },
       errorCorrectionLevel: "M",
@@ -339,21 +376,15 @@ VERIFY_HTML = """<!doctype html>
     qrEl.innerHTML = svg;
   }
 
-  function setLoading(loading) {
-    verifyBtn.disabled = loading;
-    declineBtn.disabled = loading;
-  }
-
   function resetUI() {
     qrEl.classList.add("qr-skeleton");
     qrEl.innerHTML = "";
     setDeepLinks(null);
-    clearStatus();
-    setLoading(false);
+    declineBtn.disabled = false;
   }
 
   declineBtn.addEventListener("click", async () => {
-    setLoading(true);
+    declineBtn.disabled = true;
     try {
       await fetch("/decline", { method: "POST" });
       setStatus(
@@ -362,27 +393,35 @@ VERIFY_HTML = """<!doctype html>
         "later by asking your assistant to verify with World ID."
       );
     } catch (err) {
-      setStatus("err", "Couldn't record decline: " + (err && err.message ? err.message : err));
-      setLoading(false);
+      setStatus(
+        "err",
+        "Couldn't record decline: " +
+        (err && err.message ? err.message : err)
+      );
+      declineBtn.disabled = false;
     }
   });
 
   async function startVerify() {
-    setLoading(true);
-    setStatus("scanning", "Loading IDKit...");
+    setStatus("loading", "Loading World ID...");
     let cfg;
     try {
       const cfgResp = await fetch("/idkit-config");
       if (!cfgResp.ok) {
         const text = await cfgResp.text();
-        setStatus("err", "Couldn't fetch IDKit config (" + cfgResp.status + "): " + text);
-        setLoading(false);
+        setStatus(
+          "err",
+          "Couldn't fetch IDKit config (" + cfgResp.status + "): " + text
+        );
         return;
       }
       cfg = await cfgResp.json();
     } catch (err) {
-      setStatus("err", "Couldn't reach engram-server: " + (err && err.message ? err.message : err));
-      setLoading(false);
+      setStatus(
+        "err",
+        "Couldn't reach engram-server: " +
+        (err && err.message ? err.message : err)
+      );
       return;
     }
 
@@ -401,8 +440,11 @@ VERIFY_HTML = """<!doctype html>
         return_to: window.location.href,
       }).preset(orbLegacy());
     } catch (err) {
-      setStatus("err", "Couldn't start IDKit: " + (err && err.message ? err.message : err));
-      setLoading(false);
+      setStatus(
+        "err",
+        "Couldn't start IDKit: " +
+        (err && err.message ? err.message : err)
+      );
       return;
     }
 
@@ -411,7 +453,8 @@ VERIFY_HTML = """<!doctype html>
     try {
       await renderQR(uri);
     } catch (err) {
-      // QR rendering shouldn't be fatal -- the deep link still works.
+      // QR rendering failure shouldn't be fatal -- the deep link still
+      // works, so just log and keep going.
       console.error("QR render failed:", err);
     }
     setStatus(
@@ -426,8 +469,9 @@ VERIFY_HTML = """<!doctype html>
     } catch (err) {
       setStatusHTML(
         "err",
-        "Verification failed: " + (err && err.message ? err.message : err) +
-        "<br><a href=\\"#\\" id=\\"retry\\">Try again</a>."
+        "Verification failed: " +
+        (err && err.message ? err.message : err) +
+        ' &middot; <a href="#" id="retry">Try again</a>'
       );
       document.getElementById("retry").addEventListener("click", (e) => {
         e.preventDefault();
@@ -437,7 +481,10 @@ VERIFY_HTML = """<!doctype html>
       return;
     }
 
-    setStatus("exchanging", "Got proof -- exchanging it for an access token...");
+    setStatus(
+      "exchanging",
+      "Got proof -- exchanging it for an access token..."
+    );
     let ex;
     try {
       ex = await fetch("/proof", {
@@ -446,8 +493,11 @@ VERIFY_HTML = """<!doctype html>
         body: JSON.stringify(proof),
       });
     } catch (err) {
-      setStatus("err", "Couldn't reach engram-server: " + (err && err.message ? err.message : err));
-      setLoading(false);
+      setStatus(
+        "err",
+        "Couldn't reach engram-server: " +
+        (err && err.message ? err.message : err)
+      );
       return;
     }
     if (!ex.ok) {
@@ -455,7 +505,7 @@ VERIFY_HTML = """<!doctype html>
       setStatusHTML(
         "err",
         "engram-server rejected the proof (" + ex.status + "): " + text +
-        "<br><a href=\\"#\\" id=\\"retry\\">Try again</a>."
+        ' &middot; <a href="#" id="retry">Try again</a>'
       );
       document.getElementById("retry").addEventListener("click", (e) => {
         e.preventDefault();
@@ -464,10 +514,13 @@ VERIFY_HTML = """<!doctype html>
       });
       return;
     }
+    declineBtn.disabled = true;
     setStatus("ok", "Verified! You can close this tab.");
   }
 
-  verifyBtn.addEventListener("click", startVerify);
+  // Auto-start on page load -- there's no reason to make the user click
+  // "Verify" first when they got here for exactly that.
+  startVerify();
 </script>
 </body>
 </html>
