@@ -37,7 +37,18 @@ async def test_index_returns_verify_html() -> None:
         resp = await http.get("/")
     assert resp.status_code == 200
     assert resp.text == VERIFY_HTML
+    # Buttons retain their copy across the design refresh.
     assert "Verify with World ID" in resp.text
+    assert "I'd rather not" in resp.text
+    # Design-guidelines elements: branded title, QR container, deep-link
+    # button, IDKit core import, qrcode renderer.
+    assert "Connect your World ID" in resp.text
+    assert 'id="qr"' in resp.text
+    assert "Open in World App" in resp.text
+    assert "@worldcoin/idkit-core@4" in resp.text
+    assert "qrcode@" in resp.text
+    # The page wires its own URL into return_to so mobile users come back.
+    assert "return_to: window.location.href" in resp.text
 
 
 async def test_idkit_config_proxies_upstream() -> None:
