@@ -46,6 +46,12 @@ VERIFY_TOOL_HINT = (
     "their mind before calling `verify_world_id` again."
 )
 
+MISSING_ORG_CONFIG_HINT = (
+    "engram-mcp-sdk requires the host process to set ENGRAM_API_KEY and "
+    "ENGRAM_ORG_ID before the `learn` and `recall` tools can be used. "
+    "Contact the operator of this MCP server to configure them."
+)
+
 
 def _client_for(config: Config) -> EngramClient:
     return EngramClient(
@@ -68,6 +74,14 @@ def _gate(state: State) -> None:
         "Engram's memory tools require World ID verification. "
         + VERIFY_TOOL_HINT
     )
+
+
+def _require_org_config(config: Config) -> tuple[str, str]:
+    """Return ``(api_key, org_id)`` or raise a ``ToolError`` if either is unset."""
+
+    if not config.api_key or not config.org_id:
+        raise ToolError(MISSING_ORG_CONFIG_HINT)
+    return config.api_key, config.org_id
 
 
 def build_engram_server(
@@ -104,12 +118,16 @@ def build_engram_server(
         ),
     )
     async def learn(content: str) -> dict[str, Any]:
+        api_key, org_id = _require_org_config(config)
         state = load_state(config.state_path)
         _gate(state)
         client = factory()
         try:
             return await client.learn(
-                access_token=state.access_token or "", content=content
+                api_key=api_key,
+                access_token=state.access_token or "",
+                org_id=org_id,
+                content=content,
             )
         except UnauthorizedError:
             clear_state(config.state_path)
@@ -130,12 +148,15 @@ def build_engram_server(
         ),
     )
     async def recall(query: str, limit: int = 5) -> dict[str, Any]:
+        api_key, org_id = _require_org_config(config)
         state = load_state(config.state_path)
         _gate(state)
         client = factory()
         try:
             return await client.recall(
+                api_key=api_key,
                 access_token=state.access_token or "",
+                org_id=org_id,
                 query=query,
                 limit=limit,
             )

@@ -22,6 +22,8 @@ def config(state_dir: Path) -> Config:
         state_dir=state_dir,
         verify_timeout_seconds=2.0,
         http_timeout_seconds=2.0,
+        api_key="test-api-key",
+        org_id="test-org",
     )
 
 
@@ -31,6 +33,8 @@ def _isolate_env(monkeypatch: pytest.MonkeyPatch, state_dir: Path) -> None:
 
     monkeypatch.setenv("ENGRAM_STATE_DIR", str(state_dir))
     monkeypatch.setenv("ENGRAM_SERVER_URL", "http://test-server:8000")
+    monkeypatch.setenv("ENGRAM_API_KEY", "test-api-key")
+    monkeypatch.setenv("ENGRAM_ORG_ID", "test-org")
     # Disable cwd .env files / etc.
     for var in ("HOME", "XDG_CONFIG_HOME"):
         monkeypatch.setenv(var, str(state_dir.parent / "fake-home"))

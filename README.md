@@ -1,7 +1,11 @@
 # Engram MCP SDK
 
 A drop-in [FastMCP][fastmcp] sub-server that augments any MCP server with
-Engram's memory tools, gated behind a one-time World ID verification.
+Engram's memory tools. Designed for organizations integrating Engram into
+their own product: every memory write requires **both** the organization's
+API key (proving the org is a paying customer) **and** a one-time World ID
+verification per end-user (proving a uniquely-verified human is making the
+call, so a bot army with a leaked API key can't poison memory at scale).
 
 [fastmcp]: https://gofastmcp.com/
 
@@ -19,6 +23,10 @@ agent to call `verify_world_id`. If the user explicitly declines (clicks
 "I'd rather not" on the verification page), the SDK persists that
 preference and the memory tools continue to refuse with a "user declined"
 message until the user asks the agent to re-verify.
+
+They also refuse if the host process hasn't configured `ENGRAM_API_KEY` and
+`ENGRAM_ORG_ID` (the org credentials), with a `ToolError` that names both
+variables explicitly.
 
 ## Install
 
@@ -57,12 +65,32 @@ expose to the host (e.g. Claude Desktop).
 
 ## Configuration
 
-| Env var                        | Default                              | Notes                                                                |
-| ------------------------------ | ------------------------------------ | -------------------------------------------------------------------- |
-| `ENGRAM_SERVER_URL`            | `http://localhost:8000`              | Base URL of engram-server (no trailing slash).                       |
-| `ENGRAM_STATE_DIR`             | `<platform user config dir>`         | Where the cached access token + opt-out marker live.                 |
-| `ENGRAM_VERIFY_TIMEOUT_SECONDS`| `300`                                | How long `verify_world_id` waits for the user to complete the page.  |
-| `ENGRAM_HTTP_TIMEOUT_SECONDS`  | `20`                                 | Per-request timeout against engram-server.                           |
+| Env var                        | Required                  | Default                              | Notes                                                                |
+| ------------------------------ | ------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
+| `ENGRAM_API_KEY`               | yes (for `learn`/`recall`)| —                                    | The customer-organization's API key. Sent as `Authorization: Bearer <api_key>` on every memory call. |
+| `ENGRAM_ORG_ID`                | yes (for `learn`/`recall`)| —                                    | Organization id those memories belong to. Becomes the path's `{organization_id}` segment. |
+| `ENGRAM_SERVER_URL`            | no                        | `http://localhost:8000`              | Base URL of engram-server (no trailing slash).                       |
+| `ENGRAM_STATE_DIR`             | no                        | `<platform user config dir>`         | Where the cached access token + opt-out marker live.                 |
+| `ENGRAM_VERIFY_TIMEOUT_SECONDS`| no                        | `300`                                | How long `verify_world_id` waits for the user to complete the page.  |
+| `ENGRAM_HTTP_TIMEOUT_SECONDS`  | no                        | `20`                                 | Per-request timeout against engram-server.                           |
+
+`ENGRAM_API_KEY` and `ENGRAM_ORG_ID` aren't required at SDK import time —
+the `verify_world_id` tool stays usable without them — but `learn` and
+`recall` will fail at call time with a clear error if either is missing.
+
+## How auth stacks
+
+```
+            +-----------------------------+
+  learn /   |  Authorization: Bearer <api_key>     <-- ENGRAM_API_KEY
+  recall  --+                                          (per organization,
+            |  X-World-ID-Token: <access_token>          static, in env)
+            +-----------------------------+
+                                            <-- access_token from
+                                                verify_world_id
+                                                (per human, persisted
+                                                 in state.json)
+```
 
 ## How verification works
 
@@ -106,9 +134,9 @@ re-verify.
 
 ## Engram-server contract
 
-The SDK targets the **World-ID-authed slice** of [engram-server][es].
-Engram-server also exposes an org-scoped API-key surface and a per-user
-Supabase-JWT surface; this SDK doesn't touch either.
+The SDK targets the **organization slice** of [engram-server][es] (with
+World-ID stacked on top). Engram-server also exposes a per-user Supabase-JWT
+surface for unauthenticated public search; this SDK doesn't touch it.
 
 [es]: https://github.com/EthanKim8683/engram-server
 
@@ -132,19 +160,21 @@ POST /world-id/access-token
   -> 401 if the proof is invalid
   -> 502 if the upstream verify request fails
 
-POST /v1/learn
-  headers: { "Authorization": "Bearer <access_token>" }
+POST /v1/organizations/{org_id}/learn
+  headers: {
+    "Authorization":   "Bearer <api_key>",      # ENGRAM_API_KEY
+    "X-World-ID-Token": "<access_token>"        # from verify_world_id
+  }
   body:    { "content": "...", "metadata": {...}? }
   -> 200 <Supermemory documents.add response>
-  -> 401 if the bearer is missing/expired/revoked
-  -> 403 if the user is banned
+  -> 401 if either credential is missing/invalid
+  -> 403 if the API key isn't bound to {org_id} or the verified human is banned
 
-POST /v1/recall
-  headers: { "Authorization": "Bearer <access_token>" }
+POST /v1/organizations/{org_id}/recall
+  headers: same two as /learn
   body:    { "query": "...", "limit": 5?, "similarity_threshold": 0.7? }
   -> 200 <Supermemory search.memories response>
-  -> 401 if the bearer is missing/expired/revoked
-  -> 403 if the user is banned
+  -> 401 / 403: same as above
 ```
 
 Required env vars on the engram-server side:
