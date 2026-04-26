@@ -6,11 +6,12 @@ Wraps the four engram-server endpoints the SDK depends on:
   init payload (``app_id`` + ``action`` + signed ``rp_context``).
 * ``POST /world-id/access-token``                            -- exchange an
   IDKit proof for a bearer access token.
-* ``POST /v1/organizations/{org_id}/learn``                  -- store a memory
+* ``POST /v1/organizations/learn``                           -- store a memory
   in the org's container. Stacked auth: ``Authorization: Bearer <api_key>``
-  identifies the *organization*; ``X-World-ID-Token: <access_token>`` proves
-  a uniquely-verified human is making the call.
-* ``POST /v1/organizations/{org_id}/recall``                 -- search that
+  identifies the *organization* (engram-server resolves the API key to the
+  bound ``organization_id`` server-side); ``X-World-ID-Token:
+  <access_token>`` proves a uniquely-verified human is making the call.
+* ``POST /v1/organizations/recall``                          -- search that
   same container with the same two headers.
 
 The client surfaces typed exceptions so the FastMCP tool layer can decide
@@ -22,7 +23,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
 
 import httpx
 
@@ -102,14 +102,12 @@ class EngramClient:
         *,
         api_key: str,
         access_token: str,
-        org_id: str,
         content: str,
     ) -> dict[str, Any]:
         return await self._org_post(
             "learn",
             api_key=api_key,
             access_token=access_token,
-            org_id=org_id,
             body={"content": content},
         )
 
@@ -118,7 +116,6 @@ class EngramClient:
         *,
         api_key: str,
         access_token: str,
-        org_id: str,
         query: str,
         limit: int = 5,
     ) -> dict[str, Any]:
@@ -126,7 +123,6 @@ class EngramClient:
             "recall",
             api_key=api_key,
             access_token=access_token,
-            org_id=org_id,
             body={"query": query, "limit": limit},
         )
 
@@ -136,13 +132,11 @@ class EngramClient:
         *,
         api_key: str,
         access_token: str,
-        org_id: str,
         body: dict[str, Any],
     ) -> dict[str, Any]:
-        path = f"/v1/organizations/{quote(org_id, safe='')}/{verb}"
         async with self._client() as c:
             resp = await c.post(
-                path,
+                f"/v1/organizations/{verb}",
                 json=body,
                 headers={
                     "Authorization": f"Bearer {api_key}",
