@@ -100,22 +100,37 @@ will fail at call time with a clear error if it's missing.
    app behind [uvicorn][u].
 2. Opens the user's default browser at `http://127.0.0.1:<port>/`. (On
    headless boxes the URL is logged so the user can open it manually.)
-3. The page loads `@worldcoin/idkit-core` from a CDN, fetches a signed
-   `rp_context` from engram-server (proxied through the local server),
-   and presents the user with two buttons:
-   - **Verify with World ID** — runs `IDKit.request(...)`, polls until
-     World App returns a proof, then POSTs the proof to the local
-     `/proof` endpoint, which forwards it to engram-server's
-     `/world-id/access-token` route. The resulting bearer token is
-     persisted to the SDK state file.
-   - **I'd rather not** — POSTs to `/decline`, which records the
-     opt-out in the state file. Memory tools then refuse with a clear
-     "user declined" message.
-4. The local server shuts down once either branch resolves, or after
+3. The page loads `@worldcoin/idkit-core@4` and `qrcode` from a CDN
+   (the same `qrcode` library that the official `@worldcoin/idkit` React
+   widget bundles), fetches a signed `rp_context` from engram-server
+   (proxied through the local server), and renders the IDKit UX
+   recommended by World ID's [design guidelines][dg]:
+   - A **QR code** of the IDKit `connectorURI` (≥160px, the minimum the
+     guidelines require) for desktop users to scan with World App.
+   - An **"Open in World App"** universal-link button — promoted to the
+     top of the card on mobile user-agents so a single tap launches
+     World App without any scanning.
+   - **Status states** that match the guidelines: idle → scanning →
+     exchanging → verified / canceled / connection-lost / error, with
+     a "Try again" affordance on transient failures.
+   - An **"I'd rather not"** decline button that POSTs to `/decline`
+     and records the opt-out in the state file. Memory tools then
+     refuse with a clear "user declined" message.
+4. `IDKit.request(...)` is called with `return_to: window.location.href`
+   so a mobile user that taps the deep-link button is bounced back to
+   the localhost page after verifying in World App.
+5. On success the page POSTs the proof to the local `/proof` endpoint,
+   which forwards it to engram-server's `/world-id/access-token` route;
+   the resulting bearer token is persisted to the SDK state file.
+6. The local server shuts down once either branch resolves, or after
    `ENGRAM_VERIFY_TIMEOUT_SECONDS`.
+
+The HTML lives in [`verify_page.py`](src/engram_mcp_sdk/verify_page.py)
+(no React, no build step -- everything loads from CDNs at runtime).
 
 [s]: https://www.starlette.io/
 [u]: https://www.uvicorn.org/
+[dg]: https://docs.world.org/world-id/idkit/design-guidelines
 
 ## State file
 
