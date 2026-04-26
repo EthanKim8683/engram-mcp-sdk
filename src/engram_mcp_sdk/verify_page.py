@@ -39,36 +39,51 @@ VERIFY_HTML = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Engram - Connect your World ID</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;600;700&family=Geist:wght@400;500;600&display=swap">
 <style>
   :root {
-    --bg-1: #0b0b0e;
-    --bg-2: #161620;
-    --card: #15151b;
-    --card-border: #26262f;
-    --hairline: #1f1f27;
-    --fg: #f4f4f6;
-    --muted: #a8a8b1;
-    --subtle: #6f6f78;
-    --accent: #4f46e5;
-    --accent-hover: #6357f0;
-    --decline: #20202a;
-    --decline-hover: #2a2a36;
-    --ok: #22c55e;
-    --warn: #f59e0b;
-    --err: #ef4444;
-    --link: #93c5fd;
+    /* Engram landing palette (cream / ink / red). */
+    --engram-cream: #fff1ef;
+    --engram-cream-soft: #fff8f7;
+    --engram-red: #ff3623;
+    --engram-red-hover: #e52a18;
+    --engram-ink: #1a1414;
+    --engram-ink-70: rgba(26, 20, 20, 0.7);
+    --engram-ink-55: rgba(26, 20, 20, 0.55);
+    --engram-ink-45: rgba(26, 20, 20, 0.45);
+    --engram-ink-15: rgba(26, 20, 20, 0.15);
+    --engram-ink-10: rgba(26, 20, 20, 0.1);
+    --engram-ink-06: rgba(26, 20, 20, 0.06);
+
+    --bg-1: var(--engram-cream);
+    --card: var(--engram-cream-soft);
+    --card-border: var(--engram-ink-10);
+    --hairline: var(--engram-ink-10);
+    --fg: var(--engram-ink);
+    --muted: var(--engram-ink-70);
+    --subtle: var(--engram-ink-55);
+    --accent: var(--engram-red);
+    --accent-hover: var(--engram-red-hover);
+    --decline: var(--engram-ink-06);
+    --decline-hover: rgba(26, 20, 20, 0.1);
+    --ok: #1f9d55;
+    --warn: #c47500;
+    --err: var(--engram-red);
+    --link: var(--engram-red);
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI",
-      Roboto, sans-serif;
+    font-family: "Geist", -apple-system, BlinkMacSystemFont, "Inter",
+      "Segoe UI", Roboto, sans-serif;
     margin: 0;
     background:
       radial-gradient(900px 500px at 50% -120px,
-        rgba(79, 70, 229, 0.18) 0%, transparent 60%),
+        rgba(255, 54, 35, 0.16) 0%, transparent 60%),
       radial-gradient(600px 400px at 50% 120%,
-        rgba(255, 255, 255, 0.04) 0%, transparent 60%),
+        rgba(255, 54, 35, 0.08) 0%, transparent 60%),
       var(--bg-1);
     color: var(--fg);
     display: flex;
@@ -81,13 +96,13 @@ VERIFY_HTML = """<!doctype html>
   .card {
     width: 380px;
     max-width: 100%;
-    background: linear-gradient(180deg, #181821 0%, #131319 100%);
+    background: var(--card);
     border: 1px solid var(--card-border);
-    border-radius: 18px;
+    border-radius: 20px;
     padding: 28px 24px 22px;
     box-shadow:
-      0 24px 60px rgba(0, 0, 0, 0.55),
-      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      0 24px 60px rgba(26, 20, 20, 0.08),
+      0 2px 6px rgba(26, 20, 20, 0.04);
     text-align: center;
   }
   .brand {
@@ -98,18 +113,23 @@ VERIFY_HTML = """<!doctype html>
     margin-bottom: 18px;
     border: 1px solid var(--card-border);
     border-radius: 999px;
+    background: var(--engram-cream);
     color: var(--muted);
     font-size: 12px;
     letter-spacing: 0.02em;
   }
   .brand svg { display: block; }
+  .brand .logo { color: var(--engram-red); }
   .brand .sep { color: var(--subtle); }
-  .brand .who { color: #ffffff; font-weight: 600; }
+  .brand .who { color: var(--engram-ink); font-weight: 600; }
   h1 {
-    font-size: 20px;
+    font-family: "Bricolage Grotesque", "Geist", -apple-system,
+      BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+    font-size: 22px;
     margin: 0 0 6px;
     font-weight: 600;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.015em;
+    color: var(--engram-ink);
   }
   p.lead {
     margin: 0 auto 22px;
@@ -128,8 +148,8 @@ VERIFY_HTML = """<!doctype html>
     border-radius: 14px;
     padding: 16px;
     box-shadow:
-      0 12px 30px rgba(0, 0, 0, 0.35),
-      0 0 0 1px rgba(255, 255, 255, 0.04);
+      0 12px 30px rgba(26, 20, 20, 0.08),
+      0 0 0 1px var(--engram-ink-10);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -143,7 +163,7 @@ VERIFY_HTML = """<!doctype html>
     border-radius: 8px;
     background: linear-gradient(
       90deg,
-      #ececec 0%, #f7f7f7 50%, #ececec 100%
+      #f2e4e1 0%, #fff8f7 50%, #f2e4e1 100%
     );
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
@@ -157,34 +177,37 @@ VERIFY_HTML = """<!doctype html>
     font-size: 12.5px;
     margin: 0 0 16px;
   }
-  .qr-caption strong { color: #ffffff; font-weight: 600; }
+  .qr-caption strong { color: var(--engram-ink); font-weight: 600; }
   .deeplink {
     display: block;
     text-align: center;
     text-decoration: none;
     background: var(--accent);
-    color: white;
+    color: var(--engram-cream);
     font-weight: 600;
     font-size: 13.5px;
     padding: 11px 14px;
     border-radius: 10px;
     margin-bottom: 10px;
-    transition: background 0.12s ease;
+    transition: background 0.12s ease, color 0.12s ease,
+      border-color 0.12s ease;
   }
   .deeplink:hover { background: var(--accent-hover); }
   .deeplink[aria-disabled="true"] {
-    opacity: 0.4;
+    opacity: 0.5;
     pointer-events: none;
     background: var(--decline);
+    color: var(--engram-ink-55);
   }
   .deeplink-secondary {
     background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--card-border);
+    color: var(--engram-red);
+    border: 1px solid rgba(255, 54, 35, 0.5);
   }
   .deeplink-secondary:hover {
-    background: var(--decline);
-    color: var(--fg);
+    background: var(--accent);
+    color: var(--engram-cream);
+    border-color: var(--accent);
   }
   .decline {
     display: block;
@@ -207,7 +230,7 @@ VERIFY_HTML = """<!doctype html>
     margin: 14px auto 0;
     padding: 10px 12px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.02);
+    background: var(--engram-cream);
     border: 1px solid var(--hairline);
     font-size: 12.5px;
     color: var(--muted);
@@ -237,9 +260,9 @@ VERIFY_HTML = """<!doctype html>
   .status.ok .dot { background: var(--ok); }
   .status.err .dot { background: var(--err); }
   @keyframes pulse {
-    0%   { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0.6); }
-    70%  { box-shadow: 0 0 0 6px rgba(79, 70, 229, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(79, 70, 229, 0); }
+    0%   { box-shadow: 0 0 0 0 rgba(255, 54, 35, 0.55); }
+    70%  { box-shadow: 0 0 0 6px rgba(255, 54, 35, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(255, 54, 35, 0); }
   }
   .status .body { flex: 1; }
   .status a {
@@ -275,10 +298,12 @@ VERIFY_HTML = """<!doctype html>
 <body>
 <div class="card" role="main" aria-labelledby="title">
   <div class="brand" aria-hidden="true">
-    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-      <circle cx="7" cy="7" r="6" stroke="white" stroke-width="1.4"/>
-      <path d="M2 7h10M7 2c1.6 1.4 2.5 3.1 2.5 5S8.6 10.6 7 12M7 2C5.4 3.4 4.5 5.1 4.5 7S5.4 10.6 7 12"
-            stroke="white" stroke-width="1.2" fill="none"/>
+    <svg class="logo" width="16" height="16" viewBox="0 0 22 22"
+         fill="currentColor">
+      <circle cx="11" cy="3" r="2.4"/>
+      <circle cx="3" cy="19" r="2.4"/>
+      <circle cx="19" cy="19" r="2.4"/>
+      <path d="M11 8.4c-1.8 0-3.3 1.4-3.3 3.2 0 1.7 1.5 3.2 3.3 3.2 1.8 0 3.3-1.5 3.3-3.2 0-1.8-1.5-3.2-3.3-3.2Zm-7.7 5.2 2.7 4.5c.6 1 2 1.4 3 .8.7-.4 1.1-1 1.2-1.7l-2-3.4-3.4-1.1c-.6.2-1.2.5-1.5 1Zm15.4 0c-.3-.5-.9-.8-1.5-1l-3.4 1.1-2 3.4c.1.7.5 1.3 1.2 1.7 1 .6 2.4.2 3-.8l2.7-4.4Zm-3-7.4c-.4-.7-1-1.1-1.7-1.2L11 7l1 3.6c.6.4 1.4.5 2 .1 1-.6 1.4-1.9.8-2.9l-1-1.6Zm-7.4 0L7.3 8c-.6 1-.2 2.3.8 2.9.6.4 1.4.3 2-.1L11 7 9.4 5C8.7 5.1 8 5.5 7.6 6.2Z"/>
     </svg>
     <span class="who">Engram</span>
     <span class="sep">×</span>
@@ -369,7 +394,7 @@ VERIFY_HTML = """<!doctype html>
       type: "svg",
       margin: 0,
       width: 200,
-      color: { dark: "#0a0a0c", light: "#ffffff" },
+      color: { dark: "#1a1414", light: "#ffffff" },
       errorCorrectionLevel: "M",
     });
     qrEl.classList.remove("qr-skeleton");
