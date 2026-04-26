@@ -70,7 +70,7 @@ expose to the host (e.g. Claude Desktop).
 | ------------------------------ | ------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
 | `ENGRAM_API_KEY`               | yes (for `learn`/`recall`)| —                                    | The customer-organization's API key. Sent as `Authorization: Bearer <api_key>` on every memory call. The org id is bound to this key server-side; no separate `ORG_ID` needed. |
 | `ENGRAM_SERVER_URL`            | no                        | `http://localhost:8000`              | Base URL of engram-server (no trailing slash).                       |
-| `ENGRAM_STATE_DIR`             | no                        | `<platform user config dir>`         | Where the cached access token + opt-out marker live.                 |
+| `ENGRAM_STATE_DIR`             | no                        | `~/.engram`                          | Where the cached access token + opt-out marker live. Defaults to a fixed path under `$HOME` so every Engram-augmented MCP server running as the same OS user shares one verification — see [State file](#state-file). |
 | `ENGRAM_VERIFY_TIMEOUT_SECONDS`| no                        | `300`                                | How long `verify_world_id` waits for the user to complete the page.  |
 | `ENGRAM_HTTP_TIMEOUT_SECONDS`  | no                        | `20`                                 | Per-request timeout against engram-server.                           |
 
@@ -119,7 +119,8 @@ will fail at call time with a clear error if it's missing.
 
 ## State file
 
-Lives at `<state_dir>/state.json` (mode `0600`). Two fields:
+Lives at `<state_dir>/state.json` (mode `0600`), defaulting to
+`~/.engram/state.json`. Two fields:
 
 ```json
 {
@@ -131,6 +132,24 @@ Lives at `<state_dir>/state.json` (mode `0600`). Two fields:
 Either field may be `null`. Clearing this file (or just deleting it) is the
 "factory reset" — the next memory-tool call will prompt the user to
 re-verify.
+
+### Shared across MCP servers
+
+The default path is **fixed** (`~/.engram/state.json`), not derived from a
+platform-specific config dir or scoped to a single MCP host. That's
+deliberate: an end user can have ten different Engram-augmented MCP
+servers installed (one per integrator that ships an `engram-mcp-sdk`
+mount), and all of them resolve the same `~/.engram/state.json`. The user
+verifies with World ID **once** — every server sees the cached
+`access_token` on the next `learn` / `recall` call. Likewise, declining in
+one server is honoured by all of them until the user explicitly asks an
+agent to re-run `verify_world_id`.
+
+If you need to isolate state (e.g. tests, multi-tenant CI, a developer
+running two unrelated Engram orgs side-by-side), set
+`ENGRAM_STATE_DIR=/some/other/dir` for that process. Hosts that want a
+single shared state across an entire organization can point every server
+at the same `ENGRAM_STATE_DIR`.
 
 ## Engram-server contract
 
