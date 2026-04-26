@@ -24,9 +24,10 @@ agent to call `verify_world_id`. If the user explicitly declines (clicks
 preference and the memory tools continue to refuse with a "user declined"
 message until the user asks the agent to re-verify.
 
-They also refuse if the host process hasn't configured `ENGRAM_API_KEY` and
-`ENGRAM_ORG_ID` (the org credentials), with a `ToolError` that names both
-variables explicitly.
+They also refuse if the host process hasn't configured `ENGRAM_API_KEY`
+(the org credential), with a `ToolError` that names the variable
+explicitly. The organization id is bound 1:1 to the API key on
+engram-server's side, so the SDK doesn't need a separate `ORG_ID`.
 
 ## Install
 
@@ -67,16 +68,15 @@ expose to the host (e.g. Claude Desktop).
 
 | Env var                        | Required                  | Default                              | Notes                                                                |
 | ------------------------------ | ------------------------- | ------------------------------------ | -------------------------------------------------------------------- |
-| `ENGRAM_API_KEY`               | yes (for `learn`/`recall`)| —                                    | The customer-organization's API key. Sent as `Authorization: Bearer <api_key>` on every memory call. |
-| `ENGRAM_ORG_ID`                | yes (for `learn`/`recall`)| —                                    | Organization id those memories belong to. Becomes the path's `{organization_id}` segment. |
+| `ENGRAM_API_KEY`               | yes (for `learn`/`recall`)| —                                    | The customer-organization's API key. Sent as `Authorization: Bearer <api_key>` on every memory call. The org id is bound to this key server-side; no separate `ORG_ID` needed. |
 | `ENGRAM_SERVER_URL`            | no                        | `http://localhost:8000`              | Base URL of engram-server (no trailing slash).                       |
 | `ENGRAM_STATE_DIR`             | no                        | `<platform user config dir>`         | Where the cached access token + opt-out marker live.                 |
 | `ENGRAM_VERIFY_TIMEOUT_SECONDS`| no                        | `300`                                | How long `verify_world_id` waits for the user to complete the page.  |
 | `ENGRAM_HTTP_TIMEOUT_SECONDS`  | no                        | `20`                                 | Per-request timeout against engram-server.                           |
 
-`ENGRAM_API_KEY` and `ENGRAM_ORG_ID` aren't required at SDK import time —
-the `verify_world_id` tool stays usable without them — but `learn` and
-`recall` will fail at call time with a clear error if either is missing.
+`ENGRAM_API_KEY` isn't required at SDK import time — the
+`verify_world_id` tool stays usable without it — but `learn` and `recall`
+will fail at call time with a clear error if it's missing.
 
 ## How auth stacks
 
@@ -160,17 +160,20 @@ POST /world-id/access-token
   -> 401 if the proof is invalid
   -> 502 if the upstream verify request fails
 
-POST /v1/organizations/{org_id}/learn
+POST /v1/organizations/learn
   headers: {
     "Authorization":   "Bearer <api_key>",      # ENGRAM_API_KEY
     "X-World-ID-Token": "<access_token>"        # from verify_world_id
   }
   body:    { "content": "...", "metadata": {...}? }
   -> 200 <Supermemory documents.add response>
+  # engram-server resolves the API key to its bound organization_id and
+  # uses that as the Supermemory container_tag. The org id is NOT on the
+  # path -- the API key alone identifies the org.
   -> 401 if either credential is missing/invalid
-  -> 403 if the API key isn't bound to {org_id} or the verified human is banned
+  -> 403 if the API key is unknown or the verified human is banned
 
-POST /v1/organizations/{org_id}/recall
+POST /v1/organizations/recall
   headers: same two as /learn
   body:    { "query": "...", "limit": 5?, "similarity_threshold": 0.7? }
   -> 200 <Supermemory search.memories response>

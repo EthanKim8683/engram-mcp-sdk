@@ -80,11 +80,11 @@ async def test_learn_posts_to_org_path_with_stacked_headers() -> None:
     out = await client.learn(
         api_key="key-abc",
         access_token="tok-xyz",
-        org_id="org-1",
         content="hello",
     )
     assert out == {"id": "mem-1"}
-    assert captured["url"].endswith("/v1/organizations/org-1/learn")
+    # No org id in the path -- engram-server resolves it from the API key.
+    assert captured["url"].endswith("/v1/organizations/learn")
     assert captured["auth"] == "Bearer key-abc"
     assert captured["world_id"] == "tok-xyz"
     assert b"hello" in captured["body"]
@@ -104,33 +104,15 @@ async def test_recall_posts_to_org_path_with_stacked_headers() -> None:
     out = await client.recall(
         api_key="key-abc",
         access_token="tok",
-        org_id="org-1",
         query="foo",
         limit=3,
     )
     assert out == {"results": []}
-    assert captured["url"].endswith("/v1/organizations/org-1/recall")
+    assert captured["url"].endswith("/v1/organizations/recall")
     assert captured["auth"] == "Bearer key-abc"
     assert captured["world_id"] == "tok"
     body = captured["body"].decode()
     assert "foo" in body and "3" in body
-
-
-async def test_learn_url_encodes_org_id() -> None:
-    captured: dict[str, Any] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        captured["url"] = str(request.url)
-        return httpx.Response(200, json={})
-
-    client = _client_with_handler(handler)
-    await client.learn(
-        api_key="k",
-        access_token="t",
-        org_id="weird/org id",
-        content="x",
-    )
-    assert "/v1/organizations/weird%2Forg%20id/learn" in captured["url"]
 
 
 async def test_401_raises_unauthorized() -> None:
@@ -139,9 +121,7 @@ async def test_401_raises_unauthorized() -> None:
 
     client = _client_with_handler(handler)
     with pytest.raises(UnauthorizedError) as excinfo:
-        await client.learn(
-            api_key="k", access_token="tok", org_id="o", content="x"
-        )
+        await client.learn(api_key="k", access_token="tok", content="x")
     assert excinfo.value.status_code == 401
     assert excinfo.value.body == {"detail": "expired"}
 
@@ -152,8 +132,6 @@ async def test_500_raises_engram_server_error() -> None:
 
     client = _client_with_handler(handler)
     with pytest.raises(EngramServerError) as excinfo:
-        await client.recall(
-            api_key="k", access_token="tok", org_id="o", query="q"
-        )
+        await client.recall(api_key="k", access_token="tok", query="q")
     assert excinfo.value.status_code == 500
     assert excinfo.value.body == "boom"

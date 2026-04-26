@@ -42,14 +42,12 @@ class _FakeClient:
         *,
         api_key: str,
         access_token: str,
-        org_id: str,
         content: str,
     ) -> dict[str, Any]:
         self.learn_calls.append(
             {
                 "api_key": api_key,
                 "access_token": access_token,
-                "org_id": org_id,
                 "content": content,
             }
         )
@@ -60,7 +58,6 @@ class _FakeClient:
         *,
         api_key: str,
         access_token: str,
-        org_id: str,
         query: str,
         limit: int = 5,
     ) -> dict[str, Any]:
@@ -68,7 +65,6 @@ class _FakeClient:
             {
                 "api_key": api_key,
                 "access_token": access_token,
-                "org_id": org_id,
                 "query": query,
                 "limit": limit,
             }
@@ -98,30 +94,28 @@ async def _call(server, name: str, args: dict[str, Any]) -> Any:
 # ---------- gating logic ----------------------------------------------------
 
 
-def _config_without_org(config: Config) -> Config:
+def _config_without_api_key(config: Config) -> Config:
     return Config(
         server_url=config.server_url,
         state_dir=config.state_dir,
         verify_timeout_seconds=config.verify_timeout_seconds,
         http_timeout_seconds=config.http_timeout_seconds,
         api_key=None,
-        org_id=None,
     )
 
 
-async def test_learn_fails_when_org_config_missing(config: Config) -> None:
+async def test_learn_fails_when_api_key_missing(config: Config) -> None:
     """Even verified users can't write if the host hasn't set ENGRAM_API_KEY."""
     record_token(config.state_path, "tok-cached")
-    server = _build(_config_without_org(config), _FakeClient())
+    server = _build(_config_without_api_key(config), _FakeClient())
     with pytest.raises(ToolError) as excinfo:
         await _call(server, "learn", {"content": "x"})
     assert "ENGRAM_API_KEY" in str(excinfo.value)
-    assert "ENGRAM_ORG_ID" in str(excinfo.value)
 
 
-async def test_recall_fails_when_org_config_missing(config: Config) -> None:
+async def test_recall_fails_when_api_key_missing(config: Config) -> None:
     record_token(config.state_path, "tok-cached")
-    server = _build(_config_without_org(config), _FakeClient())
+    server = _build(_config_without_api_key(config), _FakeClient())
     with pytest.raises(ToolError) as excinfo:
         await _call(server, "recall", {"query": "x"})
     assert "ENGRAM_API_KEY" in str(excinfo.value)
@@ -165,7 +159,6 @@ async def test_learn_and_recall_succeed_when_verified(config: Config) -> None:
         {
             "api_key": "test-api-key",
             "access_token": "tok-cached",
-            "org_id": "test-org",
             "content": "the sky is blue",
         }
     ]
@@ -173,7 +166,6 @@ async def test_learn_and_recall_succeed_when_verified(config: Config) -> None:
         {
             "api_key": "test-api-key",
             "access_token": "tok-cached",
-            "org_id": "test-org",
             "query": "color of sky",
             "limit": 5,
         }

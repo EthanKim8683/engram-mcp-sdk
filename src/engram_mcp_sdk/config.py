@@ -3,15 +3,15 @@
 All knobs are read from environment variables on first access so a host
 process can override them at startup.
 
-Required env vars (server can still start without them, but the ``learn`` /
+Required env var (server can still start without it, but the ``learn`` /
 ``recall`` tools will fail at call time with a clear error -- the
 ``verify_world_id`` tool stays usable so a user can complete the World ID
 verification ahead of any memory write):
 
 * ``ENGRAM_API_KEY`` -- the customer-organization's API key. Sent as
-  ``Authorization: Bearer <api_key>`` on every memory call.
-* ``ENGRAM_ORG_ID``  -- the organization id those memories belong to.
-  Becomes the path's ``{organization_id}`` segment.
+  ``Authorization: Bearer <api_key>`` on every memory call. The
+  organization id is bound to this key server-side, so the SDK doesn't
+  need (and the host doesn't have to configure) a separate ``ORG_ID``.
 
 Other env vars all have defaults and are documented in the README.
 """
@@ -37,7 +37,6 @@ class Config:
     verify_timeout_seconds: float
     http_timeout_seconds: float
     api_key: str | None
-    org_id: str | None
 
     @property
     def state_path(self) -> Path:
@@ -73,5 +72,4 @@ def load_config() -> Config:
             )
         ),
         api_key=os.environ.get("ENGRAM_API_KEY") or None,
-        org_id=os.environ.get("ENGRAM_ORG_ID") or None,
     )
