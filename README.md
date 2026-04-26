@@ -106,16 +106,19 @@ re-verify.
 
 ## Engram-server contract
 
-The SDK assumes engram-server exposes two HTTP routes (added separately as
-a follow-up to engram-server PR #5):
+The SDK targets the **World-ID-authed slice** of [engram-server][es].
+Engram-server also exposes an org-scoped API-key surface and a per-user
+Supabase-JWT surface; this SDK doesn't touch either.
+
+[es]: https://github.com/EthanKim8683/engram-server
 
 ```
 GET  /world-id/idkit-config
   -> 200 {
-       "app_id":     "app_xxxx",
-       "action":     "get-access-token",
+       "app_id":     "app_xxxx",          # WORLD_ID_APP_ID upstream
+       "action":     "get-access-token",  # WORLD_ID_ACTION upstream
        "rp_context": {
-         "rp_id":      "rp_xxxx",
+         "rp_id":      "rp_xxxx",          # WORLD_ID_RP_ID upstream
          "nonce":      "0x...",
          "created_at": 1700000000,
          "expires_at": 1700000300,
@@ -127,11 +130,29 @@ POST /world-id/access-token
   body: { "proof": <IDKit verify body> }
   -> 200 { "access_token": "<opaque bearer credential>" }
   -> 401 if the proof is invalid
+  -> 502 if the upstream verify request fails
+
+POST /v1/learn
+  headers: { "Authorization": "Bearer <access_token>" }
+  body:    { "content": "...", "metadata": {...}? }
+  -> 200 <Supermemory documents.add response>
+  -> 401 if the bearer is missing/expired/revoked
+  -> 403 if the user is banned
+
+POST /v1/recall
+  headers: { "Authorization": "Bearer <access_token>" }
+  body:    { "query": "...", "limit": 5?, "similarity_threshold": 0.7? }
+  -> 200 <Supermemory search.memories response>
+  -> 401 if the bearer is missing/expired/revoked
+  -> 403 if the user is banned
 ```
 
-The memory tools call `POST /v1/learn` and `POST /v1/recall` with
-`Authorization: Bearer <access_token>` (the cached token from the state
-file).
+Required env vars on the engram-server side:
+`WORLD_ID_APP_ID`, `WORLD_ID_RP_ID`, `WORLD_ID_ACTION`,
+`WORLD_ID_KEY_MASTER_SECRET`, `WORLD_ID_RP_SIGNING_KEY` —
+see [engram-server's README][esr] for the full list and defaults.
+
+[esr]: https://github.com/EthanKim8683/engram-server#readme
 
 ## Development
 
