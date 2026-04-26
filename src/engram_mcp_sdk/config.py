@@ -22,10 +22,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from platformdirs import user_config_dir
-
 DEFAULT_VERIFY_TIMEOUT_SECONDS = 300.0
 DEFAULT_HTTP_TIMEOUT_SECONDS = 20.0
+
+#: Fixed, well-known directory under ``$HOME`` where the SDK persists the
+#: World ID access token. The path is intentionally hard-coded (rather than
+#: resolved through ``platformdirs``) so every Engram-augmented MCP server
+#: running as the same OS user lands on the *same* file -- one verification
+#: covers all of them, no matter which company's MCP launched the SDK.
+DEFAULT_STATE_DIR_NAME = ".engram"
 
 
 @dataclass(frozen=True)
@@ -43,11 +48,21 @@ class Config:
         return self.state_dir / "state.json"
 
 
+def default_state_dir() -> Path:
+    """Return the fixed default state directory (``~/.engram``).
+
+    Exposed so callers (and tests) can refer to the same path the SDK uses
+    by default.
+    """
+
+    return Path.home() / DEFAULT_STATE_DIR_NAME
+
+
 def _state_dir() -> Path:
     override = os.environ.get("ENGRAM_STATE_DIR")
     if override:
         return Path(override)
-    return Path(user_config_dir("engram-mcp-sdk"))
+    return default_state_dir()
 
 
 def load_config() -> Config:
