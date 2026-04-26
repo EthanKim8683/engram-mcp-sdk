@@ -37,15 +37,41 @@ class _FakeClient:
         self.recall_response: dict[str, Any] = {"results": []}
         self.exchange_response: str = "tok-fresh"
 
-    async def learn(self, *, access_token: str, content: str) -> dict[str, Any]:
-        self.learn_calls.append({"access_token": access_token, "content": content})
+    async def learn(
+        self,
+        *,
+        api_key: str,
+        access_token: str,
+        org_id: str,
+        content: str,
+    ) -> dict[str, Any]:
+        self.learn_calls.append(
+            {
+                "api_key": api_key,
+                "access_token": access_token,
+                "org_id": org_id,
+                "content": content,
+            }
+        )
         return self.learn_response
 
     async def recall(
-        self, *, access_token: str, query: str, limit: int = 5
+        self,
+        *,
+        api_key: str,
+        access_token: str,
+        org_id: str,
+        query: str,
+        limit: int = 5,
     ) -> dict[str, Any]:
         self.recall_calls.append(
-            {"access_token": access_token, "query": query, "limit": limit}
+            {
+                "api_key": api_key,
+                "access_token": access_token,
+                "org_id": org_id,
+                "query": query,
+                "limit": limit,
+            }
         )
         return self.recall_response
 
@@ -70,6 +96,35 @@ async def _call(server, name: str, args: dict[str, Any]) -> Any:
 
 
 # ---------- gating logic ----------------------------------------------------
+
+
+def _config_without_org(config: Config) -> Config:
+    return Config(
+        server_url=config.server_url,
+        state_dir=config.state_dir,
+        verify_timeout_seconds=config.verify_timeout_seconds,
+        http_timeout_seconds=config.http_timeout_seconds,
+        api_key=None,
+        org_id=None,
+    )
+
+
+async def test_learn_fails_when_org_config_missing(config: Config) -> None:
+    """Even verified users can't write if the host hasn't set ENGRAM_API_KEY."""
+    record_token(config.state_path, "tok-cached")
+    server = _build(_config_without_org(config), _FakeClient())
+    with pytest.raises(ToolError) as excinfo:
+        await _call(server, "learn", {"content": "x"})
+    assert "ENGRAM_API_KEY" in str(excinfo.value)
+    assert "ENGRAM_ORG_ID" in str(excinfo.value)
+
+
+async def test_recall_fails_when_org_config_missing(config: Config) -> None:
+    record_token(config.state_path, "tok-cached")
+    server = _build(_config_without_org(config), _FakeClient())
+    with pytest.raises(ToolError) as excinfo:
+        await _call(server, "recall", {"query": "x"})
+    assert "ENGRAM_API_KEY" in str(excinfo.value)
 
 
 async def test_learn_fails_when_unverified(config: Config) -> None:
@@ -107,10 +162,21 @@ async def test_learn_and_recall_succeed_when_verified(config: Config) -> None:
     # FastMCP wraps async tool returns in a CallToolResult; the structured
     # content should round-trip our dicts.
     assert fake.learn_calls == [
-        {"access_token": "tok-cached", "content": "the sky is blue"}
+        {
+            "api_key": "test-api-key",
+            "access_token": "tok-cached",
+            "org_id": "test-org",
+            "content": "the sky is blue",
+        }
     ]
     assert fake.recall_calls == [
-        {"access_token": "tok-cached", "query": "color of sky", "limit": 5}
+        {
+            "api_key": "test-api-key",
+            "access_token": "tok-cached",
+            "org_id": "test-org",
+            "query": "color of sky",
+            "limit": 5,
+        }
     ]
     # Sanity: both tool results carry our payloads
     assert "mem-1" in str(learn_result)
@@ -200,7 +266,7 @@ async def test_unauthorized_response_clears_token_and_directs_to_verify(
     record_token(config.state_path, "tok-stale")
 
     class _Unauthorized(_FakeClient):
-        async def learn(self, *, access_token: str, content: str):
+        async def learn(self, **_kw: Any):
             from engram_mcp_sdk.client import UnauthorizedError
 
             raise UnauthorizedError(

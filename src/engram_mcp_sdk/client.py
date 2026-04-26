@@ -1,13 +1,17 @@
 """Thin HTTP client around engram-server.
 
-Wraps the three engram-server endpoints the SDK depends on:
+Wraps the four engram-server endpoints the SDK depends on:
 
-* ``GET  /world-id/idkit-config``  -- public IDKit init payload
-  (``app_id`` + ``action`` + signed ``rp_context``).
-* ``POST /world-id/access-token``  -- exchange an IDKit proof for a bearer
-  access token.
-* ``POST /v1/learn``               -- store a memory.
-* ``POST /v1/recall``              -- search memories.
+* ``GET  /world-id/idkit-config``                            -- public IDKit
+  init payload (``app_id`` + ``action`` + signed ``rp_context``).
+* ``POST /world-id/access-token``                            -- exchange an
+  IDKit proof for a bearer access token.
+* ``POST /v1/organizations/{org_id}/learn``                  -- store a memory
+  in the org's container. Stacked auth: ``Authorization: Bearer <api_key>``
+  identifies the *organization*; ``X-World-ID-Token: <access_token>`` proves
+  a uniquely-verified human is making the call.
+* ``POST /v1/organizations/{org_id}/recall``                 -- search that
+  same container with the same two headers.
 
 The client surfaces typed exceptions so the FastMCP tool layer can decide
 whether to translate a 401 into "ask the user to re-verify" vs propagate
@@ -18,6 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -32,7 +37,13 @@ class EngramServerError(RuntimeError):
 
 
 class UnauthorizedError(EngramServerError):
-    """The access token was missing/expired/revoked. The caller must re-verify."""
+    """One of the bearer credentials was missing/expired/revoked.
+
+    Could be the org API key or the World ID access token -- engram-server
+    returns 401 in both cases. The tool layer assumes "re-verify" because
+    the API key is configured statically on the host so it's the World ID
+    token that's most likely stale.
+    """
 
 
 @dataclass(frozen=True)
@@ -86,28 +97,57 @@ class EngramClient:
         _raise_for_status(resp)
         return resp.json()["access_token"]
 
-    async def learn(self, *, access_token: str, content: str) -> dict[str, Any]:
-        return await self._authed_post(
-            "/v1/learn", access_token=access_token, body={"content": content}
+    async def learn(
+        self,
+        *,
+        api_key: str,
+        access_token: str,
+        org_id: str,
+        content: str,
+    ) -> dict[str, Any]:
+        return await self._org_post(
+            "learn",
+            api_key=api_key,
+            access_token=access_token,
+            org_id=org_id,
+            body={"content": content},
         )
 
     async def recall(
-        self, *, access_token: str, query: str, limit: int = 5
+        self,
+        *,
+        api_key: str,
+        access_token: str,
+        org_id: str,
+        query: str,
+        limit: int = 5,
     ) -> dict[str, Any]:
-        return await self._authed_post(
-            "/v1/recall",
+        return await self._org_post(
+            "recall",
+            api_key=api_key,
             access_token=access_token,
+            org_id=org_id,
             body={"query": query, "limit": limit},
         )
 
-    async def _authed_post(
-        self, path: str, *, access_token: str, body: dict[str, Any]
+    async def _org_post(
+        self,
+        verb: str,
+        *,
+        api_key: str,
+        access_token: str,
+        org_id: str,
+        body: dict[str, Any],
     ) -> dict[str, Any]:
+        path = f"/v1/organizations/{quote(org_id, safe='')}/{verb}"
         async with self._client() as c:
             resp = await c.post(
                 path,
                 json=body,
-                headers={"Authorization": f"Bearer {access_token}"},
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "X-World-ID-Token": access_token,
+                },
             )
         _raise_for_status(resp)
         return resp.json()
@@ -122,7 +162,7 @@ def _raise_for_status(resp: httpx.Response) -> None:
         body = resp.text
     if resp.status_code == 401:
         raise UnauthorizedError(
-            "engram-server rejected the access token",
+            "engram-server rejected the request credentials",
             status_code=401,
             body=body,
         )

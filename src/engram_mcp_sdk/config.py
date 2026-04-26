@@ -1,8 +1,19 @@
 """Runtime configuration for the Engram MCP SDK.
 
 All knobs are read from environment variables on first access so a host
-process can override them at startup. The only required variable is
-``ENGRAM_SERVER_URL``; everything else has sensible defaults.
+process can override them at startup.
+
+Required env vars (server can still start without them, but the ``learn`` /
+``recall`` tools will fail at call time with a clear error -- the
+``verify_world_id`` tool stays usable so a user can complete the World ID
+verification ahead of any memory write):
+
+* ``ENGRAM_API_KEY`` -- the customer-organization's API key. Sent as
+  ``Authorization: Bearer <api_key>`` on every memory call.
+* ``ENGRAM_ORG_ID``  -- the organization id those memories belong to.
+  Becomes the path's ``{organization_id}`` segment.
+
+Other env vars all have defaults and are documented in the README.
 """
 
 from __future__ import annotations
@@ -25,6 +36,8 @@ class Config:
     state_dir: Path
     verify_timeout_seconds: float
     http_timeout_seconds: float
+    api_key: str | None
+    org_id: str | None
 
     @property
     def state_path(self) -> Path:
@@ -59,4 +72,6 @@ def load_config() -> Config:
                 "ENGRAM_HTTP_TIMEOUT_SECONDS", DEFAULT_HTTP_TIMEOUT_SECONDS
             )
         ),
+        api_key=os.environ.get("ENGRAM_API_KEY") or None,
+        org_id=os.environ.get("ENGRAM_ORG_ID") or None,
     )
